@@ -10,6 +10,10 @@ def createFineGrid(gridElement):
         .set('within', subGridElement.centroid(maxError=1).containedIn(gridElement.geometry())))\
         .filter(ee.Filter.eq('within', True))
 
-def getFileList(folder):
+def getFilesNamesList(folder):
     Path.lsTif = lambda x: Enumerable(x.iterdir()).where(lambda p: p.suffix == '.tif').to_list()
     return [path.stem for path in folder.lsTif()]
+
+def getFilesList(folder):
+    Path.lsTif = lambda x: Enumerable(x.iterdir()).where(lambda p: p.suffix == '.tif').to_list()
+    return list(folder.lsTif())
