@@ -2,7 +2,7 @@
 #  - 'roi' - this needs to be an ee.Geometry(). Can get from ee.FeatureCollection('yourTableAsset').geometry()
 #  - 'began' - the start date of the event as a String
 #  - 'ended' - the end date of the event as a String
-#  - 'threshold' - "standard" or "otsu"
+#  - 'thresholdType' - "standard" or "otsu"
 #  - 'my_comp' - "2Day" or "3Day". The DFO algorithm uses multiple days of images to remove false detections from cloud shadows.
 #  - 'get_max' - option to add the maximum amount image as a band to the output default 'False'
 
@@ -13,10 +13,10 @@
 #     3: 'clear_perc': Percent clear views (clear views normalized by number of images)
 
 import ee
-import modis_toolbox
-from utils import misc, otsu
+from flood_detection import modis_toolbox
+from flood_detection.utils import misc, otsu
 
-def dfo(roi, began, ended, threshold, my_comp='3Day', get_max=False):
+def dfo(roi, began, ended, thresholdType, my_comp='3Day', get_max=False):
 
     # Get rectangular bounds because it works faster than complex geometries.
     # Clip to actual geometry at the end.
@@ -55,7 +55,7 @@ def dfo(roi, began, ended, threshold, my_comp='3Day', get_max=False):
     # collection so they can be accessed in together in the DFO algorithm.
     modis = ee.ImageCollection(terra_final.merge(aqua_final)\
                                 .sort("system:time_start", True))
-    print "Collected and pre-processed MODIS Images"
+    print("Collected and pre-processed MODIS Images")
 
     # STEP 3 - APPLY THE DFO WATER DETECTION & COMPOSITING ALGORITHMS
     # Okay - this is where it starts to get exciting.  The portion of the code
@@ -66,9 +66,9 @@ def dfo(roi, began, ended, threshold, my_comp='3Day', get_max=False):
     # the static thresholds from DFO
 
     # STEP 3.1 - SELECT thresholds
-    if threshold == "standard":
+    if thresholdType == "standard":
         thresh_dict = {"b1b2": 0.70, "b7": 675.00, 'base_res': None}
-    elif threshold == "otsu":
+    elif thresholdType == "otsu":
 
         # Apply the qa_mask to each modis image.  We then make a composite across
         # all the flood images to one image.  This is done so to increase the
@@ -120,7 +120,7 @@ def dfo(roi, began, ended, threshold, my_comp='3Day', get_max=False):
                        'b7': swir_thresh.getInfo(),
                        'base_res':base_res}
 
-        print "Calculated thresholds for Otsu: {0}".format(thresh_dict)
+        print("Calculated thresholds for Otsu: {0}".format(thresh_dict))
 
     else:
         raise ValueError("'threshold' options are 'standard' or 'otsu'")
@@ -258,7 +258,7 @@ def dfo(roi, began, ended, threshold, my_comp='3Day', get_max=False):
                                                              ["clear_views"]).toUint16()
         def add_obs(img):
             obs = img.select(["cloud_state"],["observation"]).gte(0)
-            return img.addBands(obs);
+            return img.addBands(obs)
         observations = img_coll.map(add_obs)
         total_obs = observations.select('observation').sum()
         clear_perc = number_clear_views.divide(ee.Image(total_obs))\
@@ -296,7 +296,7 @@ def dfo(roi, began, ended, threshold, my_comp='3Day', get_max=False):
                             .clip(roi)\
                             .set({"began": ee.Date(began).format("yyyy-MM-dd"),
                                   "ended": ee.Date(ended).format("yyyy-MM-dd"),
-                                  "threshold_type": threshold,
+                                  "threshold_type": thresholdType,
                                   "max_img_date": max_img_date})
     elif get_max == False:
         # STEP 3.5_FALSE: PREP FINAL IMAGES
@@ -304,10 +304,10 @@ def dfo(roi, began, ended, threshold, my_comp='3Day', get_max=False):
         dfo_final = ee.Image(dfo_flood_img).addBands(dfo_clear_days).clip(roi)\
                             .set({"began": ee.Date(began).format("yyyy-MM-dd"),
                                   "ended": ee.Date(ended).format("yyyy-MM-dd"),
-                                  "threshold_type": threshold})
+                                  "threshold_type": thresholdType})
 
     else:
         raise ValueError("'max_img' options are 'True' or 'False'")
 
-    print "DFO Flood Dectection Complete"
+    print("DFO Flood Dectection Complete")
     return dfo_final
